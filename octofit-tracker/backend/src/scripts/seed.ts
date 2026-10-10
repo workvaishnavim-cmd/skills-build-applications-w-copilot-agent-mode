@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
 import {
-  ActivityModel,
-  LeaderboardEntryModel,
-  TeamModel,
-  UserModel,
-  WorkoutModel,
+  activity,
+  leaderboard,
+  team,
+  user,
+  workout,
 } from '../models/index.js';
 
 const connectionString = process.env.MONGODB_URI || 'mongodb://localhost:27017/octofit_db';
@@ -23,14 +23,17 @@ async function seedDatabase(): Promise<void> {
       { username: 'sam-taylor', name: 'Sam Taylor', email: 'sam.taylor@example.com' },
     ];
 
-    const users = new Map<string, (typeof UserModel)['prototype']>();
+    const users = new Map<string, (typeof user)['prototype']>();
     for (const fixture of userFixtures) {
-      const user = await UserModel.findOneAndUpdate(
-        { username: fixture.username },
-        { $set: fixture },
-        { upsert: true, new: true, runValidators: true },
-      );
-      users.set(fixture.username, user);
+      const existingUser = await user.findOne({ username: fixture.username });
+      const seededUser = existingUser
+        ? await user.findOneAndUpdate(
+            { _id: existingUser._id },
+            { $set: fixture },
+            { new: true, runValidators: true },
+          )
+        : await user.create(fixture);
+      if (seededUser) users.set(fixture.username, seededUser);
     }
 
     const maya = users.get('maya-chen');
@@ -56,14 +59,17 @@ async function seedDatabase(): Promise<void> {
       },
     ];
 
-    const teams = new Map<string, (typeof TeamModel)['prototype']>();
+    const teams = new Map<string, (typeof team)['prototype']>();
     for (const fixture of teamFixtures) {
-      const team = await TeamModel.findOneAndUpdate(
-        { name: fixture.name },
-        { $set: fixture },
-        { upsert: true, new: true, runValidators: true },
-      );
-      teams.set(fixture.name, team);
+      const existingTeam = await team.findOne({ name: fixture.name });
+      const seededTeam = existingTeam
+        ? await team.findOneAndUpdate(
+            { _id: existingTeam._id },
+            { $set: fixture },
+            { new: true, runValidators: true },
+          )
+        : await team.create(fixture);
+      if (seededTeam) teams.set(fixture.name, seededTeam);
     }
 
     const trailblazers = teams.get('Trailblazers');
@@ -122,12 +128,18 @@ async function seedDatabase(): Promise<void> {
     ];
 
     for (const fixture of activityFixtures) {
-      const { user, type, date, ...activity } = fixture;
-      await ActivityModel.findOneAndUpdate(
-        { user, type, date },
-        { $set: { user, type, date, ...activity } },
-        { upsert: true, new: true, runValidators: true },
-      );
+      const { user, type, date, ...activityValues } = fixture;
+      const filter = { user, type, date };
+      const existingActivity = await activity.findOne(filter);
+      if (existingActivity) {
+        await activity.findOneAndUpdate(
+          { _id: existingActivity._id },
+          { $set: { user, type, date, ...activityValues } },
+          { new: true, runValidators: true },
+        );
+      } else {
+        await activity.create({ user, type, date, ...activityValues });
+      }
     }
 
     const leaderboardFixtures = [
@@ -138,11 +150,16 @@ async function seedDatabase(): Promise<void> {
     ];
 
     for (const fixture of leaderboardFixtures) {
-      await LeaderboardEntryModel.findOneAndUpdate(
-        { user: fixture.user },
-        { $set: fixture },
-        { upsert: true, new: true, runValidators: true },
-      );
+      const existingEntry = await leaderboard.findOne({ user: fixture.user });
+      if (existingEntry) {
+        await leaderboard.findOneAndUpdate(
+          { _id: existingEntry._id },
+          { $set: fixture },
+          { new: true, runValidators: true },
+        );
+      } else {
+        await leaderboard.create(fixture);
+      }
     }
 
     const workoutFixtures = [
@@ -189,20 +206,25 @@ async function seedDatabase(): Promise<void> {
     ];
 
     for (const fixture of workoutFixtures) {
-      await WorkoutModel.findOneAndUpdate(
-        { name: fixture.name },
-        { $set: fixture },
-        { upsert: true, new: true, runValidators: true },
-      );
+      const existingWorkout = await workout.findOne({ name: fixture.name });
+      if (existingWorkout) {
+        await workout.findOneAndUpdate(
+          { _id: existingWorkout._id },
+          { $set: fixture },
+          { new: true, runValidators: true },
+        );
+      } else {
+        await workout.create(fixture);
+      }
     }
 
     const [userCount, teamCount, activityCount, leaderboardCount, workoutCount] =
       await Promise.all([
-        UserModel.countDocuments(),
-        TeamModel.countDocuments(),
-        ActivityModel.countDocuments(),
-        LeaderboardEntryModel.countDocuments(),
-        WorkoutModel.countDocuments(),
+        user.countDocuments(),
+        team.countDocuments(),
+        activity.countDocuments(),
+        leaderboard.countDocuments(),
+        workout.countDocuments(),
       ]);
     console.log(
       `Database seeding complete: ${userCount} users, ${teamCount} teams, ` +

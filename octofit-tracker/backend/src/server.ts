@@ -1,10 +1,13 @@
 import express from 'express';
 import './config/database.js';
-import { apiBaseUrl } from './config/api.js';
 import apiRouter from './routes/api.js';
 
 const app = express();
 const port = 8000;
+const codespaceName = process.env.CODESPACE_NAME;
+const apiBaseUrl = codespaceName
+  ? `https://${codespaceName}-8000.app.github.dev`
+  : 'http://localhost:8000';
 
 app.use(express.json());
 
@@ -12,7 +15,7 @@ app.get('/api/health', (_request, response) => {
   response.json({ status: 'ok', apiBaseUrl });
 });
 
-app.use('/api', apiRouter);
+app.use(apiRouter);
 
 app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
   if (error instanceof Error && 'name' in error && error.name === 'ValidationError') {
